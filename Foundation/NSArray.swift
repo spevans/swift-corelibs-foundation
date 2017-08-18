@@ -652,7 +652,7 @@ public struct NSBinarySearchingOptions : OptionSet {
     public static let insertionIndex = NSBinarySearchingOptions(rawValue: 1 << 10)
 }
 
-open class NSMutableArray : NSArray {
+open class NSMutableArray : NSArray, __NSDummyProtocol {
     
     open func add(_ anObject: Any) {
         insert(anObject, at: count)

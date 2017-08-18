@@ -265,6 +265,8 @@ public func NSStringFromClass(_ aClass: AnyClass) -> String {
     canonical encoding for other types yet, except for the mangled name, which is
     neither stable nor human-readable.
  */
+internal protocol __NSDummyProtocol {}
+
 public func NSClassFromString(_ aClassName: String) -> AnyClass? {
     let aClassNameWithPrefix : String
     let components = aClassName._bridgeToObjectiveC().components(separatedBy: ".")

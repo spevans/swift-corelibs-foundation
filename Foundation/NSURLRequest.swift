@@ -352,7 +352,7 @@ open class NSURLRequest : NSObject, NSSecureCoding, NSCopying, NSMutableCopying 
 /// `NSMutableURLRequest` categories that are available. The
 /// `NSMutableHTTPURLRequest` category on `NSMutableURLRequest` is an
 /// example.
-open class NSMutableURLRequest : NSURLRequest {
+open class NSMutableURLRequest : NSURLRequest, __NSDummyProtocol {
     public required init?(coder aDecoder: NSCoder) {
         super.init(coder: aDecoder)
     }

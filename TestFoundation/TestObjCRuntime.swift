@@ -15,7 +15,8 @@
     import SwiftXCTest
 #endif
 
-class SwiftClass {
+private protocol __DummyProtocol {}
+class SwiftClass: __DummyProtocol {
     class InnerClass {}
 }
 

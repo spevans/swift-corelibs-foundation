@@ -550,7 +550,7 @@ extension Dictionary : _NSBridgeable, _CFBridgeable {
     internal var _cfObject: CFDictionary { return _nsObject._cfObject }
 }
 
-open class NSMutableDictionary : NSDictionary {
+open class NSMutableDictionary : NSDictionary, __NSDummyProtocol {
     
     open func removeObject(forKey aKey: Any) {
         guard type(of: self) === NSDictionary.self || type(of: self) === NSMutableDictionary.self else {

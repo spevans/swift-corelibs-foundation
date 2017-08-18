@@ -141,7 +141,7 @@ open class URLResponse : NSObject, NSSecureCoding, NSCopying {
 /// HTTP URL load. It is a specialization of URLResponse which
 /// provides conveniences for accessing information specific to HTTP
 /// protocol responses.
-open class HTTPURLResponse : URLResponse {
+open class HTTPURLResponse : URLResponse, __NSDummyProtocol {
     
     /// Initializer for HTTPURLResponse objects.
     ///
