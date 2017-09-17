@@ -1468,6 +1468,7 @@ extension TestJSONSerialization {
     } 
     
     func test_serializeSortedKeys() {
+ if #available(OSX 10.13, *) {
         var dict: [String: Any]
 
         dict = ["z": 1, "y": 1, "x": 1, "w": 1, "v": 1, "u": 1, "t": 1, "s": 1, "r": 1, "q": 1, ]
@@ -1478,6 +1479,7 @@ extension TestJSONSerialization {
 
         dict = ["c": ["c":1,"b":1,"a":1],"b":["c":1,"b":1,"a":1],"a":["c":1,"b":1,"a":1]]
         XCTAssertEqual(try trySerialize(dict, options: .sortedKeys), "{\"a\":{\"a\":1,\"b\":1,\"c\":1},\"b\":{\"a\":1,\"b\":1,\"c\":1},\"c\":{\"a\":1,\"b\":1,\"c\":1}}")
+        }
     }
 
     func test_serializePrettyPrinted() {

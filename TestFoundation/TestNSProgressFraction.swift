@@ -17,7 +17,7 @@ import SwiftXCTest
 
 class TestProgressFraction : XCTestCase {
     static var allTests: [(String, (TestProgressFraction) -> () throws -> Void)] {
-        return [
+        return [/**
             ("test_equal", test_equal ),
             ("test_subtract", test_subtract),
             ("test_multiply", test_multiply),
@@ -27,9 +27,9 @@ class TestProgressFraction : XCTestCase {
             ("test_andAndSubtractOverflow", test_andAndSubtractOverflow),
             ("test_fractionFromDouble", test_fractionFromDouble),
             ("test_unnecessaryOverflow", test_unnecessaryOverflow),
-        ]
+   ***/     ]
     }
-
+/***
     func test_equal() {
         let f1 = _ProgressFraction(completed: 5, total: 10)
         let f2 = _ProgressFraction(completed: 100, total: 200)
@@ -158,5 +158,6 @@ class TestProgressFraction : XCTestCase {
         let r = f1 + f2
         XCTAssertFalse(r.overflowed)
     }
+ ***/
 }
 

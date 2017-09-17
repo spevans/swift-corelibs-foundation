@@ -550,18 +550,20 @@ class TestNSArray : XCTestCase {
     }
 
     func test_readWriteURL() {
-        let data = NSArray(arrayLiteral: "one", "two", "three", "four", "five")
-        do {
-            let tempDir = NSTemporaryDirectory() + "TestFoundation_Playground_" + NSUUID().uuidString
-            try FileManager.default.createDirectory(atPath: tempDir, withIntermediateDirectories: false, attributes: nil)
-            let testFile = tempDir + "/readWriteURL.txt"
-            let url = URL(fileURLWithPath: testFile)
-            try data.write(to: url)
-            let data2 = try NSArray(contentsOf: url, error: ())
-            XCTAssertEqual(data, data2)
-            removeTestFile(testFile)
-        } catch let e {
-            XCTFail("Failed to write to file: \(e)")
+        if #available(OSX 10.13, *) {
+            let data = NSArray(arrayLiteral: "one", "two", "three", "four", "five")
+            do {
+                let tempDir = NSTemporaryDirectory() + "TestFoundation_Playground_" + NSUUID().uuidString
+                try FileManager.default.createDirectory(atPath: tempDir, withIntermediateDirectories: false, attributes: nil)
+                let testFile = tempDir + "/readWriteURL.txt"
+                let url = URL(fileURLWithPath: testFile)
+                try data.write(to: url)
+                let data2 = try NSArray(contentsOf: url, error: ())
+                XCTAssertEqual(data, data2)
+                removeTestFile(testFile)
+            } catch let e {
+                XCTFail("Failed to write to file: \(e)")
+            }
         }
     }
 

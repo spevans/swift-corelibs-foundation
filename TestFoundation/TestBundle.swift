@@ -8,7 +8,6 @@
 //
 
 
-
 #if DEPLOYMENT_RUNTIME_OBJC || os(Linux)
     import Foundation
     import XCTest
@@ -17,6 +16,19 @@
     import SwiftXCTest
 #endif
 
+
+internal func testBundle() -> Bundle {
+#if DARWIN_COMPATIBILITY_TESTS
+    for b in Bundle.allBundles {
+        if b.resourcePath != nil && b.bundleIdentifier != nil && b.bundleIdentifier! == "org.swift.DarwinCompatibilityTests" {
+            return b
+        }
+    }
+    fatalError("Cant find test bundle")
+#else
+    return Bundle.main
+#endif
+}
 
 
 class TestBundle : XCTestCase {
@@ -36,29 +48,35 @@ class TestBundle : XCTestCase {
     }
     
     func test_paths() {
-        let bundle = Bundle.main
-        
+        let bundle = testBundle()
+
         // bundlePath
         XCTAssert(!bundle.bundlePath.isEmpty)
         XCTAssertEqual(bundle.bundleURL.path, bundle.bundlePath)
         let path = bundle.bundlePath
-        
+        print("path:", path)
         // etc
         #if os(OSX)
         XCTAssertEqual("\(path)/Contents/Resources", bundle.resourcePath)
+#if DARWIN_COMPATIBILITY_TESTS
+        XCTAssertEqual("\(path)/Contents/MacOS/DarwinCompatibilityTests", bundle.executablePath)
+#else
         XCTAssertEqual("\(path)/Contents/MacOS/TestFoundation", bundle.executablePath)
+#endif
         XCTAssertEqual("\(path)/Contents/Frameworks", bundle.privateFrameworksPath)
         XCTAssertEqual("\(path)/Contents/SharedFrameworks", bundle.sharedFrameworksPath)
         XCTAssertEqual("\(path)/Contents/SharedSupport", bundle.sharedSupportPath)
         #endif
         
         XCTAssertNil(bundle.path(forAuxiliaryExecutable: "no_such_file"))
+#if !DARWIN_COMPATIBILITY_TESTS
         XCTAssertNil(bundle.appStoreReceiptURL)
+#endif
     }
     
     func test_resources() {
-        let bundle = Bundle.main
-        
+        let bundle = testBundle()
+
         // bad resources
         XCTAssertNil(bundle.url(forResource: nil, withExtension: nil, subdirectory: nil))
         XCTAssertNil(bundle.url(forResource: "", withExtension: "", subdirectory: nil))
@@ -77,24 +95,37 @@ class TestBundle : XCTestCase {
     }
     
     func test_infoPlist() {
-        let bundle = Bundle.main
+        let bundle = testBundle()
         
         // bundleIdentifier
+#if DARWIN_COMPATIBILITY_TESTS
+        XCTAssertEqual("org.swift.DarwinCompatibilityTests", bundle.bundleIdentifier)
+#else
         XCTAssertEqual("org.swift.TestFoundation", bundle.bundleIdentifier)
-        
+#endif
+
         // infoDictionary
         let info = bundle.infoDictionary
         XCTAssertNotNil(info)
-        XCTAssert("org.swift.TestFoundation" == info!["CFBundleIdentifier"] as! String)
+
+#if DARWIN_COMPATIBILITY_TESTS
+        XCTAssert("DarwinCompatibilityTests" == info!["CFBundleName"] as! String)
+        XCTAssert("org.swift.DarwinCompatibilityTests" == info!["CFBundleIdentifier"] as! String)
+#else
         XCTAssert("TestFoundation" == info!["CFBundleName"] as! String)
-        
+        XCTAssert("org.swift.TestFoundation" == info!["CFBundleIdentifier"] as! String)
+#endif
+
         // localizedInfoDictionary
         XCTAssertNil(bundle.localizedInfoDictionary) // FIXME: Add a localized Info.plist for testing
     }
     
     func test_localizations() {
-        let bundle = Bundle.main
-        
+        let bundle = testBundle() //Bundle.main
+
+        print("1,", bundle.localizations)
+        print("2,", bundle.preferredLocalizations)
+
         XCTAssertEqual(["en"], bundle.localizations)
         XCTAssertEqual(["en"], bundle.preferredLocalizations)
         XCTAssertEqual(["en"], Bundle.preferredLocalizations(from: ["en", "pl", "es"]))
@@ -196,6 +227,4 @@ class TestBundle : XCTestCase {
         XCTAssertThrowsError(try bundle!.preflight())
         _cleanupPlayground(playground)
     }
-
-
 }
