@@ -563,6 +563,8 @@ build ${BUILD_DIR}/.install: InstallFoundation ${BUILD_DIR}/Foundation/${DYLIB_P
 
 build install: phony | ${BUILD_DIR}/.install
 
+build ${BUILD_DIR}/Foundation/libswiftSwiftOnoneSupport.so: SymlinklibswiftSwiftOnone
+
 """
 extra_script += """
 rule RunTestFoundation

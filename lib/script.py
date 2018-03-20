@@ -218,7 +218,13 @@ rule SwiftExecutable
     description = SwiftExecutable: $out
 """
 
-        commands = cp_command + compilec_command + swiftc_command + assembler_command + link_command + swift_build_command
+        symlink_libswift_onone = """
+rule SymlinklibswiftSwiftOnone
+    command = mkdir -p `dirname $out`; /bin/ln -s ${SDKROOT}/lib/swift/""" + Configuration.current.target.swift_sdk_name + """/libswiftSwiftOnoneSupport.so $out
+    description = Symlink libwiftSwiftOnone.so
+"""
+
+        commands = cp_command + compilec_command + swiftc_command + assembler_command + link_command + swift_build_command + symlink_libswift_onone
 
         script = flags + commands
 

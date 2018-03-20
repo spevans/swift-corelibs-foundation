@@ -100,7 +100,7 @@ build """ + self.product.relative() + """: """ + self.rule + """ """ + self.runt
 
         generated += """
 
-build """ + self.product_name + """: phony | """ + self.product.relative() + """
+build """ + self.product_name + """: phony |  ${BUILD_DIR}/Foundation/libswiftSwiftOnoneSupport.so """ + self.product.relative() + """
 
 default """ + self.product_name + """
 
