@@ -489,9 +489,18 @@ open class Process: NSObject {
         self.processLaunchedCondition.broadcast()
     }
     
-    open func interrupt() { NSUnimplemented() } // Not always possible. Sends SIGINT.
-    open func terminate()  { NSUnimplemented() }// Not always possible. Sends SIGTERM.
-    
+    open func interrupt() {
+        if isRunning && processIdentifier > 0 {
+            kill(processIdentifier, SIGINT)
+        }
+    }
+
+    open func terminate() {
+        if isRunning && processIdentifier > 0 {
+            kill(processIdentifier, SIGTERM)
+        }
+    }
+
     open func suspend() -> Bool { NSUnimplemented() }
     open func resume() -> Bool { NSUnimplemented() }
     

@@ -1,10 +1,15 @@
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2017 Swift project authors
+// Copyright (c) 2017 - 2018 Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+
+//
+// This helper is used as an external sub process by both TestHTTPCookieStorage
+// and TestProcess.
 //
 
 #if DEPLOYMENT_RUNTIME_OBJC || os(Linux) || os(Android)
@@ -50,5 +55,35 @@ class XDGCheck {
     }
 }
 
-XDGCheck.run()
+// Used by TestProcess.test_interrupt()
+func sigintTest() {
+    signal(SIGINT, SIG_IGN)
+    // Timeout, to always exit
+    alarm(3)
+
+    let semaphore = DispatchSemaphore(value: 0)
+    let sQueue = DispatchQueue(label: "signal queue")
+    let source = DispatchSource.makeSignalSource(signal: SIGINT, queue: sQueue)
+    let workItem = DispatchWorkItem(block: {
+        semaphore.signal()
+    })
+
+    source.setEventHandler(handler: workItem)
+    source.resume()
+
+    print("Ready")
+    var sigIntCount = 0
+    while sigIntCount < 3 {
+        semaphore.wait()
+        sigIntCount += 1
+        print("Interrupted:", sigIntCount)
+    }
+    exit(99)
+}
+
+if let arg = ProcessInfo.processInfo.arguments.last, arg == "--sigint-test" {
+    sigintTest()
+} else {
+    XDGCheck.run()
+}
 

@@ -29,6 +29,8 @@ class TestProcess : XCTestCase {
                    ("test_no_environment", test_no_environment),
                    ("test_custom_environment", test_custom_environment),
                    ("test_run", test_run),
+                   ("test_interrupt", test_interrupt),
+                   ("test_terminate", test_terminate),
         ]
 #endif
     }
@@ -306,6 +308,56 @@ class TestProcess : XCTestCase {
         }
     }
 
+    func test_interrupt() {
+        let helper = _SignalHelperRunner(testMode: "--sigint-test")
+        // Launch the task
+        do {
+            try helper.start()
+        }  catch {
+            XCTFail("Cant run xdgTestHelper: \(error)")
+            return
+        }
+        if !helper.waitForReady() {
+            XCTFail("Didnt receive Ready from sub-process")
+            return
+        }
+
+        var interruptedCount = 0
+        var count = 10
+        while count > 0 {
+            helper.process.interrupt()
+            if let line = helper.nextLine(), line.hasPrefix("Interrupted") {
+                interruptedCount += 1
+                if interruptedCount == 3 {
+                    break
+                }
+            }
+            Thread.sleep(forTimeInterval: 0.1)
+            count -= 1
+        }
+
+        XCTAssertEqual(interruptedCount, 3)
+        helper.process.waitUntilExit()
+        let terminationReason = helper.process.terminationReason
+        XCTAssertEqual(terminationReason, Process.TerminationReason.exit)
+        let status = helper.process.terminationStatus
+        XCTAssertEqual(status, 99)
+    }
+
+    func test_terminate() {
+        let cat = URL(fileURLWithPath: "/bin/cat", isDirectory: false)
+        guard let process = try? Process.run(cat, arguments: []) else {
+            XCTFail("Cant run /bin/cat")
+            return
+        }
+
+        process.terminate()
+        process.waitUntilExit()
+        let terminationReason = process.terminationReason
+        XCTAssertEqual(terminationReason, Process.TerminationReason.uncaughtSignal)
+        XCTAssertEqual(process.terminationStatus, SIGTERM)
+    }
+
 #endif
 }
 
@@ -313,6 +365,76 @@ private enum Error: Swift.Error {
     case TerminationStatus(Int32)
     case UnicodeDecodingError(Data)
     case InvalidEnvironmentVariable(String)
+}
+
+// Run xdgTestHelper, wait for 'Ready' from the sub-process, then signal a semaphore. All following lines
+// are stored in a queue
+class _SignalHelperRunner {
+    let process = Process()
+    let semaphore = DispatchSemaphore(value: 0)
+
+    private let outputPipe = Pipe()
+    private let sQueue = DispatchQueue(label: "io queue")
+    private let source: DispatchSourceRead
+
+    private var gotReady = false
+    private var bytesIn = Data()
+    private var lines: [String] = []
+
+
+    init(testMode: String) {
+        process.executableURL = xdgTestHelperURL()
+        process.environment = ProcessInfo.processInfo.environment
+        process.arguments = [testMode]
+        process.standardOutput = outputPipe.fileHandleForWriting
+        source = DispatchSource.makeReadSource(fileDescriptor: outputPipe.fileHandleForReading.fileDescriptor, queue: sQueue)
+
+        let workItem = DispatchWorkItem(block: {
+            let newLine = UInt8(ascii: "\n")
+
+            self.bytesIn.append(self.outputPipe.fileHandleForReading.availableData)
+            if self.bytesIn.isEmpty {
+                return
+            }
+            while let index = self.bytesIn.index(of: newLine) {
+                if index > self.bytesIn.startIndex {
+                    // dont include the newline when converting to string
+                    let line = String(data: self.bytesIn[self.bytesIn.startIndex..<index], encoding: String.Encoding.utf8) ?? ""
+                    self.bytesIn.removeSubrange(self.bytesIn.startIndex...index)
+
+                    if self.gotReady == false && line == "Ready" {
+                        self.semaphore.signal()
+                        self.gotReady = true;
+                    }
+                    else if self.gotReady == true {
+                        self.lines.append(line)
+                    }
+                }
+            }
+        })
+        source.setEventHandler(handler: workItem)
+    }
+
+    func start() throws {
+        source.resume()
+        try process.run()
+    }
+
+    func waitForReady() -> Bool {
+        let now = DispatchTime.now().uptimeNanoseconds
+        let timeout = DispatchTime(uptimeNanoseconds: now + 2_000_000_000)
+        guard semaphore.wait(timeout: timeout) == .success else {
+            process.terminate()
+            return false
+        }
+        return true
+    }
+
+    func nextLine() -> String? {
+        return sQueue.sync {
+            return lines.isEmpty ? nil : lines.removeFirst()
+        }
+    }
 }
 
 #if !os(Android)
