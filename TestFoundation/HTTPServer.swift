@@ -76,6 +76,7 @@ class _TCPSocket {
         try socketAddress.withMemoryRebound(to: sockaddr.self, capacity: MemoryLayout<sockaddr>.size, { 
             let addr = UnsafePointer<sockaddr>($0)
             _ = try attempt("bind", valid: isZero, bind(listenSocket, addr, socklen_t(MemoryLayout<sockaddr>.size)))
+            _ = try attempt("listen", valid: isZero, listen(listenSocket, SOMAXCONN))
         })
 
         var actualSA = sockaddr_in()
@@ -104,7 +105,6 @@ class _TCPSocket {
     }
 
     func acceptConnection(notify: ServerSemaphore) throws {
-        _ = try attempt("listen", valid: isZero, listen(listenSocket, SOMAXCONN))
         try socketAddress.withMemoryRebound(to: sockaddr.self, capacity: MemoryLayout<sockaddr>.size, {
             let addr = UnsafeMutablePointer<sockaddr>($0)
             var sockLen = socklen_t(MemoryLayout<sockaddr>.size) 
@@ -128,14 +128,15 @@ class _TCPSocket {
     }
 
     func writeRawData(_ data: Data) throws {
+        NSLog("writeRawData: writing \(data.count) bytes")
         _ = try data.withUnsafeBytes { ptr in
             try attempt("write", valid: isNotNegative, CInt(write(connectionSocket, ptr, data.count)))
         }
     }
    
     func writeData(header: String, body: String, sendDelay: TimeInterval? = nil, bodyChunks: Int? = nil) throws {
-        var header = Array(header.utf8)
-        _  = try attempt("write", valid: isNotNegative, CInt(write(connectionSocket, &header, header.count)))
+        var _header = Array(header.utf8)
+        _  = try attempt("write", valid: isNotNegative, CInt(write(connectionSocket, &_header, _header.count)))
         
         if let sendDelay = sendDelay, let bodyChunks = bodyChunks {
             let count = max(1, Int(Double(body.utf8.count) / Double(bodyChunks)))
@@ -152,10 +153,15 @@ class _TCPSocket {
         }
     }
 
-    func shutdown() {
+    func closeClient() {
         if let connectionSocket = self.connectionSocket {
             close(connectionSocket)
+            self.connectionSocket = nil
         }
+    }
+
+    func shutdown() {
+       closeClient()
         close(listenSocket)
     }
 }
@@ -285,11 +291,13 @@ struct _HTTPRequest {
     let headers: [String]
 
     public init(request: String) {
-        let lines = request.components(separatedBy: _HTTPUtils.CRLF2)[0].components(separatedBy: _HTTPUtils.CRLF)
-        headers = Array(lines[0...lines.count-2])
-        method = Method(rawValue: headers[0].components(separatedBy: " ")[0])!
-        uri = headers[0].components(separatedBy: " ")[1]
-        body = lines.last!
+        let headerEnd = (request as NSString).range(of: _HTTPUtils.CRLF2)
+        let header = (request as NSString).substring(to: headerEnd.location)
+        headers = header.components(separatedBy: _HTTPUtils.CRLF)
+        let action = headers[0]
+        method = Method(rawValue: action.components(separatedBy: " ")[0])!
+        uri = action.components(separatedBy: " ")[1]
+        body = (request as NSString).substring(from: headerEnd.location + headerEnd.length)
     }
 
     public func getCommaSeparatedHeaders() -> String {
@@ -372,6 +380,7 @@ public class TestURLSessionServer {
         } else {
             try httpServer.respond(with: process(request: req), startDelay: self.startDelay, sendDelay: self.sendDelay, bodyChunks: self.bodyChunks)
         }
+        httpServer.socket.closeClient()
     }
 
     func process(request: _HTTPRequest) -> _HTTPResponse {
@@ -402,7 +411,7 @@ public class TestURLSessionServer {
 
         if uri == "/requestCookies" {
             let text = request.getCommaSeparatedHeaders()
-            return _HTTPResponse(response: .OK, headers: "Content-Length: \(text.data(using: .utf8)!.count)\r\nSet-Cookie: fr=anjd&232; Max-Age=7776000; path=/; domain=127.0.0.1; secure; httponly\r\nSet-Cookie: nm=sddf&232; Max-Age=7776000; path=/; domain=.swift.org; secure; httponly\r\n", body: text)
+            return _HTTPResponse(response: .OK, headers: "Content-Length: \(text.data(using: .utf8)!.count)\r\nSet-Cookie: fr=anjd&232; Max-Age=7776000; path=/\r\nSet-Cookie: nm=sddf&232; Max-Age=7776000; path=/; domain=.swift.org; secure; httponly\r\n", body: text)
         }
 
         if uri == "/setCookies" {
@@ -486,6 +495,10 @@ public class ServerSemaphore {
         dispatchSemaphore.wait()
     }
 
+    public func wait(timeout: DispatchTime) -> DispatchTimeoutResult {
+        return dispatchSemaphore.wait(timeout: timeout)
+    }
+
     public func signal() {
         dispatchSemaphore.signal()
     }
@@ -495,6 +508,8 @@ class LoopbackServerTest : XCTestCase {
     private static let staticSyncQ = DispatchQueue(label: "org.swift.TestFoundation.HTTPServer.StaticSyncQ")
 
     private static var _serverPort: Int = -1
+    private static let serverReady = ServerSemaphore()
+
     static var serverPort: Int {
         get {
             return staticSyncQ.sync { _serverPort }
@@ -511,13 +526,13 @@ class LoopbackServerTest : XCTestCase {
                 let test = try TestURLSessionServer(port: nil, startDelay: startDelay, sendDelay: sendDelay, bodyChunks: bodyChunks)
                 serverPort = Int(test.port)
                 try test.start(started: condition)
+                defer { test.stop() }
                 try test.readAndRespond()
                 serverPort = -2
-                test.stop()
             }
         }
 
-        let serverReady = ServerSemaphore()
+
         globalDispatchQueue.async {
             do {
                 try runServer(with: serverReady)
@@ -527,7 +542,20 @@ class LoopbackServerTest : XCTestCase {
                 return
             }
         }
-
         serverReady.wait()
+    }
+
+    class func waitForServerReady() {
+        let timeout = DispatchTime(uptimeNanoseconds: DispatchTime.now().uptimeNanoseconds + 2_000_000_000)
+        while serverPort == -2 {
+            guard serverReady.wait(timeout: timeout) == .success else {
+	         fatalError("Timedout waiting for server to be ready")
+            }
+	}
+    }
+
+    override func setUp() {
+        super.setUp()
+        LoopbackServerTest.waitForServerReady()
     }
 }

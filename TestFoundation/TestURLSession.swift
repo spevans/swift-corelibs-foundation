@@ -22,14 +22,14 @@ class TestURLSession : LoopbackServerTest {
             ("test_finishTaskAndInvalidate", test_finishTasksAndInvalidate),
             ("test_taskError", test_taskError),
             ("test_taskCopy", test_taskCopy),
-            ("test_cancelTask", test_cancelTask),
-            // ("test_taskTimeout", test_taskTimeout), // disabled due to intermittent failure (SR-7723)
+            ("test_cancelTask", test_cancelTask), // Breaks on Ubuntu18.04
+            ("test_taskTimeout", test_taskTimeout),
             ("test_verifyRequestHeaders", test_verifyRequestHeaders),
             ("test_verifyHttpAdditionalHeaders", test_verifyHttpAdditionalHeaders),
             ("test_timeoutInterval", test_timeoutInterval),
             ("test_httpRedirectionWithCompleteRelativePath", test_httpRedirectionWithCompleteRelativePath),
-            //("test_httpRedirectionWithInCompleteRelativePath", test_httpRedirectionWithInCompleteRelativePath), /* temporarily disabled. Needs HTTPServer rework */
-            //("test_httpRedirectionTimeout", test_httpRedirectionTimeout), /* temporarily disabled (https://bugs.swift.org/browse/SR-5751) */
+            ("test_httpRedirectionWithInCompleteRelativePath", test_httpRedirectionWithInCompleteRelativePath), /* temporarily disabled. Needs HTTPServer rework */
+            ("test_httpRedirectionTimeout", test_httpRedirectionTimeout), /* temporarily disabled (https://bugs.swift.org/browse/SR-5751) */
             ("test_http0_9SimpleResponses", test_http0_9SimpleResponses),
             ("test_outOfRangeButCorrectlyFormattedHTTPCode", test_outOfRangeButCorrectlyFormattedHTTPCode),
             ("test_missingContentLengthButStillABody", test_missingContentLengthButStillABody),
@@ -280,7 +280,8 @@ class TestURLSession : LoopbackServerTest {
             defer { expect.fulfill() }
             XCTAssertNotNil(data)
             XCTAssertNil(error as? URLError, "error = \(error as! URLError)")
-            let headers = String(data: data!, encoding: .utf8) ?? ""
+            guard let data = data else { return }
+            let headers = String(data: data, encoding: .utf8) ?? ""
             XCTAssertNotNil(headers.range(of: "header1: rvalue1"))
             XCTAssertNotNil(headers.range(of: "header2: rvalue2"))
             XCTAssertNotNil(headers.range(of: "header3: svalue3"))
@@ -341,7 +342,6 @@ class TestURLSession : LoopbackServerTest {
         waitForExpectations(timeout: 12)
     }
 
-    /*
      // temporarily disabled (https://bugs.swift.org/browse/SR-5751)
     func test_httpRedirectionTimeout() {
         let urlString = "http://127.0.0.1:\(TestURLSession.serverPort)/UnitedStates"
@@ -353,7 +353,7 @@ class TestURLSession : LoopbackServerTest {
         let task = session.dataTask(with: req) { data, response, error in
             defer { expect.fulfill() }
             if let e = error as? URLError {
-                XCTAssertEqual(e.code, .timedOut, "Unexpected error code")
+                XCTAssertEqual(e.code, .cannotConnectToHost, "Unexpected error code")
                 return
             } else {
                 XCTFail("test unexpectedly succeeded (response=\(response.debugDescription))")
@@ -362,7 +362,6 @@ class TestURLSession : LoopbackServerTest {
         task.resume()
         waitForExpectations(timeout: 12)
     }
-    */
 
     func test_http0_9SimpleResponses() {
         for brokenCity in ["Pompeii", "Sodom"] {
@@ -527,6 +526,12 @@ class TestURLSession : LoopbackServerTest {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 5
         config.httpCookieAcceptPolicy = HTTPCookie.AcceptPolicy.never
+        if let storage = config.httpCookieStorage, let cookies = storage.cookies {
+            for cookie in cookies {
+                storage.deleteCookie(cookie)
+            }
+        }
+        XCTAssertEqual(config.httpCookieStorage?.cookies?.count, 0)
         let urlString = "http://127.0.0.1:\(TestURLSession.serverPort)/requestCookies"
         let session = URLSession(configuration: config, delegate: nil, delegateQueue: nil)
         var expect = expectation(description: "POST \(urlString)")
@@ -574,7 +579,8 @@ class TestURLSession : LoopbackServerTest {
             defer { expect.fulfill() }
             XCTAssertNotNil(data)
             XCTAssertNil(error as? URLError, "error = \(error as! URLError)")
-            let headers = String(data: data!, encoding: String.Encoding.utf8) ?? ""
+            guard let data = data else { return }
+            let headers = String(data: data, encoding: String.Encoding.utf8) ?? ""
             XCTAssertNotNil(headers.range(of: "Cookie: fr=anjd&232"))
         }
         task.resume()
@@ -594,7 +600,8 @@ class TestURLSession : LoopbackServerTest {
             defer { expect.fulfill() }
             XCTAssertNotNil(data)
             XCTAssertNil(error as? URLError, "error = \(error as! URLError)")
-            let headers = String(data: data!, encoding: String.Encoding.utf8) ?? ""
+            guard let data = data else { return }
+            let headers = String(data: data, encoding: String.Encoding.utf8) ?? ""
             XCTAssertNil(headers.range(of: "Cookie: fr=anjd&232"))
         }
         task.resume()
@@ -768,6 +775,7 @@ extension DataTask : URLSessionDataDelegate {
                     dataTask: URLSessionDataTask,
                     didReceive response: URLResponse,
                     completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
+        completionHandler(.allow)
         guard responseReceivedExpectation != nil else { return }
         responseReceivedExpectation!.fulfill()
     }
