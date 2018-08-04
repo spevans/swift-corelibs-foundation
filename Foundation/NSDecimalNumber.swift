@@ -371,11 +371,13 @@ open class NSDecimalNumber : NSNumber {
     open override var uint32Value: UInt32 {
         return UInt32(exactly: decimal.doubleValue) ?? 0 as UInt32
     }
+
     open override var int64Value: Int64 {
-        return Int64(exactly: decimal.doubleValue) ?? 0 as Int64
+        return decimal.int64Value
     }
+
     open override var uint64Value: UInt64 {
-        return UInt64(exactly: decimal.doubleValue) ?? 0 as UInt64
+        return decimal.uint64Value
     }
     open override var floatValue: Float {
         return Float(decimal.doubleValue)
@@ -387,15 +389,35 @@ open class NSDecimalNumber : NSNumber {
         return !decimal.isZero
     }
     open override var intValue: Int {
+        if Int.max == Int64.max {
+            return Int(self.int64Value)
+        }
         return Int(exactly: decimal.doubleValue) ?? 0 as Int
     }
     open override var uintValue: UInt {
+        if UInt.max == UInt64.max {
+            return UInt(self.uint64Value)
+        }
         return UInt(exactly: decimal.doubleValue) ?? 0 as UInt
     }
 
     open override func isEqual(_ value: Any?) -> Bool {
-        guard let other = value as? NSDecimalNumber else { return false }
-        return self.decimal == other.decimal
+        if value is NSDecimalNumber {
+            return decimal.compare(to: (value as! NSDecimalNumber).decimal) == .orderedSame
+        }
+        else if value is NSNumber {
+            return decimal.compare(to: (value as! NSNumber).decimalValue) == .orderedSame
+        }
+        switch value {
+        case let other as Int:
+            return intValue == other
+        case let other as Double:
+            return doubleValue == other
+        case let other as Bool:
+            return boolValue == other
+        default:
+            return false
+        }
     }
 
     override var _swiftValueOfOptimalType: Any {
@@ -501,7 +523,15 @@ extension NSNumber {
         if let d = self as? NSDecimalNumber {
             return d.decimal
         } else {
-            return Decimal(self.doubleValue)
+            let type = self.objCType.pointee
+            if type == 0x64 || type == 0x66 {
+                return Decimal(self.doubleValue)
+            }
+            else if type == 0x51 {
+                return Decimal(uint64Value)
+            } else {
+                return Decimal(int64Value)
+            }
         }
     }
 }

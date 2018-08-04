@@ -226,6 +226,66 @@ extension Decimal : Hashable, Comparable {
         }
         return _isNegative != 0 ? -d : d
     }
+
+    private var _integerPartOnly: UInt64 {
+        if _length == 0 || self.magnitude < Decimal(0) {
+            return 0
+        }
+
+        var copy = self.significand
+
+        if _exponent < 0 {
+            for _ in _exponent..<0 {
+                _ = divideByShort(&copy, 10)
+            }
+        } else if _exponent > 0 {
+            for _ in 0..<_exponent {
+                _ = multiplyByShort(&copy, 10)
+            }
+        }
+        let uint64 = UInt64(copy._mantissa.3) << 48 | UInt64(copy._mantissa.2) << 32 | UInt64(copy._mantissa.1) << 16 | UInt64(copy._mantissa.0)
+        return uint64
+    }
+
+    internal var uint64Value: UInt64 {
+        let value = self._integerPartOnly
+        if !self.isNegative {
+            return value
+        }
+
+        if value == UInt64(Int64.max) + 1 {
+            return UInt64(bitPattern: Int64.min)
+        } else if value <= UInt64(Int64.max) {
+            var value = Int64(value)
+            value.negate()
+            return UInt64(bitPattern: value)
+        } else {
+            return value
+        }
+    }
+
+
+    internal var int64Value: Int64 {
+        let uint64Value = self._integerPartOnly
+        if self.isNegative {
+            if uint64Value == UInt64(Int64.max) + 1 {
+                return Int64.min
+            } else if uint64Value <= UInt64(Int64.max) {
+                var value = Int64(uint64Value)
+                value.negate()
+                return value
+            } else {
+                return Int64(bitPattern: uint64Value)
+            }
+        } else {
+            return Int64(bitPattern: uint64Value)
+        }
+
+        //let copy = _integerPartOnly
+        //var int64 = Int64(copy._mantissa.3) << 48 | Int64(copy._mantissa.2) << 32 | Int64(copy._mantissa.1) << 16 | Int64(copy._mantissa.0)
+    }
+
+
     public var hashValue: Int {
         return Int(bitPattern: __CFHashDouble(doubleValue))
     }

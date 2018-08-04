@@ -31,6 +31,7 @@ class TestDecimal: XCTestCase {
             ("test_SimpleMultiplication", test_SimpleMultiplication),
             ("test_SmallerNumbers", test_SmallerNumbers),
             ("test_ZeroPower", test_ZeroPower),
+            ("test_NSDecimalNumberValues", test_NSDecimalNumberValues),
         ]
     }
 
@@ -42,6 +43,7 @@ class TestDecimal: XCTestCase {
         XCTAssertTrue(NSDecimalNumber(string: "invalid").decimalValue.isNaN)
         XCTAssertEqual(NSDecimalNumber(value: true).boolValue, true)
         XCTAssertEqual(NSDecimalNumber(value: false).boolValue, false)
+
         XCTAssertEqual(NSDecimalNumber(value: Int.min).intValue, Int.min)
         XCTAssertEqual(NSDecimalNumber(value: UInt.min).uintValue, UInt.min)
         XCTAssertEqual(NSDecimalNumber(value: Int8.min).int8Value, Int8.min)
@@ -710,6 +712,21 @@ class TestDecimal: XCTestCase {
 
         let negativeSix = NSDecimalNumber(integerLiteral: -6)
         XCTAssertEqual(1, negativeSix.raising(toPower: 0))
+    }
+
+    func test_NSDecimalNumberValues() {
+        XCTAssertEqual(NSDecimalNumber(decimal: Decimal(string: "-1")!).intValue, -1)
+        XCTAssertEqual(NSDecimalNumber(decimal: Decimal(string: "-1")!).int64Value, -1)
+        XCTAssertEqual(NSDecimalNumber(decimal: Decimal(string: "-1")!).uint64Value, UInt64.max)
+
+        XCTAssertEqual(NSDecimalNumber(decimal: Decimal(string: "9223372036854775807")!).intValue, Int.max)
+        XCTAssertEqual(NSDecimalNumber(decimal: Decimal(string: "-9223372036854775808")!).intValue, Int.min)
+
+        let x  = NSDecimalNumber(decimal: Decimal(string: "-9223372036854775808")!)
+        let uint = x.int64Value
+        let n = NSNumber(value: uint)
+        let diff = n == x
+        XCTAssertTrue(diff)
     }
 
 }

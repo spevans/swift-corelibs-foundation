@@ -931,6 +931,10 @@ open class NSNumber : NSValue {
     }
 
     open func compare(_ otherNumber: NSNumber) -> ComparisonResult {
+        if otherNumber is NSDecimalNumber {
+            return otherNumber.compare(NSDecimalNumber(decimal: self.decimalValue))
+        }
+
         switch (_cfNumberType(), otherNumber._cfNumberType()) {
         case (kCFNumberFloatType, _), (_, kCFNumberFloatType): fallthrough
         case (kCFNumberDoubleType, _), (_, kCFNumberDoubleType):
