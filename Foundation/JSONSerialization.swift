@@ -831,13 +831,9 @@ private struct JSONReader {
 
                 var chIndex = 0
                 var ch = buffer[chIndex]
-                let isNegative: Bool
                 if ch == CChar(UInt8(ascii: "-")) {
-                    isNegative = true
                     chIndex = chIndex + 1
                     ch = buffer[chIndex]
-                } else {
-                    isNegative = false
                 }
 
                 guard ch >= CChar(UInt8(ascii: "0")) && ch <= CChar(UInt8(ascii: "9")) else {
@@ -847,87 +843,16 @@ private struct JSONReader {
                 // Only allow 1 leading zero and it must be followed by a decimal point
                 if ch == CChar(UInt8(ascii: "0")) && buffer[chIndex + 1] == CChar(UInt8(ascii: "0")) {
                     throw NSError(domain: NSCocoaErrorDomain, code: CocoaError.propertyListReadCorrupt.rawValue,
-                                  userInfo: ["NSDebugDescription" : "Number with leading zero around character 16." ])
+                                  userInfo: ["NSDebugDescription" : "Number with leading zero around character \(input)." ])
                 }
 
-#if true
                 let s = String(cString: buffer.baseAddress!)
                 let scan = Scanner(string: s)
                 var decimal = Decimal()
-                if !scan.scanDecimal(&decimal) {
+                guard scan.scanDecimal(&decimal) else {
                     return nil
                 }
-               // let retVal = NSNumber(value: decimal.doubleValue)
-               // return (retVal, scan.scanLocation)
                 return (NSDecimalNumber(decimal: decimal), scan.scanLocation)
-#else
-                // dont use this version as it will parse integers > UInt64 as Double
-                // which breaks if the result is then needed in an integer type
-                let startPointer = buffer.baseAddress!
-                let endPointer = UnsafeMutablePointer<UnsafeMutablePointer<Int8>?>.allocate(capacity: 1)
-                defer { endPointer.deallocate() }
-
-                func parseAsDouble() -> (Double, IndexDistance) {
-                    let doubleResult = strtod(startPointer, endPointer)
-                    let distance = startPointer.distance(to: endPointer[0]!)
-                    return (doubleResult, distance)
-                }
-
-                func parseAsInt64() -> (Int64?, IndexDistance) {
-                    errno = 0
-                    let int64Result = strtoll(startPointer, endPointer, 10)
-                    let outOfRange = ((int64Result == Int64.max || int64Result == Int64.min) && errno == ERANGE)
-                    let invalid = (int64Result == 0 && errno == EINVAL)
-                    let distance = startPointer.distance(to: endPointer[0]!)
-
-                    if distance == 0 || outOfRange || invalid {
-                        return (nil, distance)
-                    } else {
-                        return (int64Result, distance)
-                    }
-                }
-
-                func parseAsUInt64() -> (UInt64?, IndexDistance) {
-                    // strtoull ignores a leading '-' and always returns a positive value
-                    // so check against the flag set earlier
-                    guard !isNegative else { return (nil, 0) }
-                    errno = 0
-                    let uint64Result = strtoull(startPointer, endPointer, 10)
-                    let outOfRange = (uint64Result == UInt64.max && errno == ERANGE)
-                    let invalid = (uint64Result == 0 && errno == EINVAL)
-                    let distance = startPointer.distance(to: endPointer[0]!)
-
-                    if distance == 0 || outOfRange || invalid {
-                        return (nil, distance)
-                    } else {
-                        return (uint64Result, distance)
-                    }
-                }
-
-                // Try parsing as a Double, checks that it is some sort of number
-                let (doubleResult, doubleDistance) = parseAsDouble()
-                guard doubleDistance > 0 else { return nil }
-
-                let (int64Result, int64distance) = parseAsInt64()
-                if let result = int64Result {
-                    if int64distance == doubleDistance {
-                        // The parsed number can be represented as an Int64
-                        return (NSNumber(value: result), int64distance)
-                    } else {
-                        return (NSNumber(value: doubleResult), doubleDistance)
-                    }
-                }
-
-                // Int64 wasnt sufficient, try parsing as a UInt64
-                let (uint64Result, uint64distance) = parseAsUInt64()
-                if let result = uint64Result {
-                    return (NSNumber(value: result), uint64distance)
-                }
-
-                // This double result will be 0 or infinity for out of range values. How should they be
-                // treated?
-                return (NSNumber(value: doubleResult), doubleDistance)
-#endif
             }
         }
         

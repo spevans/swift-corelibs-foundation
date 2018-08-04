@@ -591,11 +591,10 @@ class TestJSONEncoder : XCTestCase {
         }
 
         // Leading zeros are invalid
-//        testErrorThrown("Int8", "0000000000000000000000000000001", errorMessage: "The operation could not be completed")
-//        testErrorThrown("Double", "-.1", errorMessage: "The operation could not be completed")
-//        testErrorThrown("Int32", "+1", errorMessage: "The operation could not be completed")
-//        testErrorThrown("Int", ".012", errorMessage: "The operation could not be completed")
-        return
+        testErrorThrown("Int8", "0000000000000000000000000000001", errorMessage: "The operation could not be completed")
+        testErrorThrown("Double", "-.1", errorMessage: "The operation could not be completed")
+        testErrorThrown("Int32", "+1", errorMessage: "The operation could not be completed")
+        testErrorThrown("Int", ".012", errorMessage: "The operation could not be completed")
     }
 
 
