@@ -2031,13 +2031,26 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// Returns nil when the input is not recognized as valid Base-64.
     /// - parameter base64String: The string to parse.
     /// - parameter options: Encoding options. Default value is `[]`.
-    @inlinable // This is @inlinable as a convenience initializer.
     public init?(base64Encoded base64String: __shared String, options: Data.Base64DecodingOptions = []) {
-        if let d = NSData(base64Encoded: base64String, options: Base64DecodingOptions(rawValue: options.rawValue)) {
-            self.init(bytes: d.bytes, count: d.length)
+        let result: UnsafeMutableRawBufferPointer?
+        if let _result = base64String.utf8.withContiguousStorageIfAvailable({ buffer -> UnsafeMutableRawBufferPointer? in
+                let rawBuffer = UnsafeRawBufferPointer(start: buffer.baseAddress!, count: buffer.count)
+                return NSData.base64DecodeBytes(rawBuffer, options: options)
+        }) {
+            result = _result
         } else {
-            return nil
+            // Slow path, unlikely that withContiguousStorageIfAvailable will fail but if it does, fall back to an
+            // Array(base64String.utf8). This will allocate and copy but it is the simplest way to get a contiguous buffer.
+            result = Array(base64String.utf8).withUnsafeBytes {
+                NSData.base64DecodeBytes($0, options: options)
+            }
         }
+        guard let decodedBytes = result else { return nil }
+
+        let deallocator = Deallocator.custom({ (ptr, count) in
+                ptr.deallocate()
+        })
+        self.init(bytesNoCopy: decodedBytes.baseAddress!, count: decodedBytes.count, deallocator: deallocator)
     }
     
     /// Initialize a `Data` from a Base-64, UTF-8 encoded `Data`.
@@ -2046,13 +2059,15 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     ///
     /// - parameter base64Data: Base-64, UTF-8 encoded input data.
     /// - parameter options: Decoding options. Default value is `[]`.
-    @inlinable // This is @inlinable as a convenience initializer.
     public init?(base64Encoded base64Data: __shared Data, options: Data.Base64DecodingOptions = []) {
-        if let d = NSData(base64Encoded: base64Data, options: Base64DecodingOptions(rawValue: options.rawValue)) {
-            self.init(bytes: d.bytes, count: d.length)
-        } else {
+        guard let decodedBytes = base64Data.withUnsafeBytes({ rawBuffer in
+                NSData.base64DecodeBytes(rawBuffer, options: options)
+        }) else {
             return nil
         }
+
+        let deallocator = Deallocator.custom({ (ptr, count) in ptr.deallocate() })
+        self.init(bytesNoCopy: decodedBytes.baseAddress!, count: decodedBytes.count, deallocator: deallocator)
     }
     
     /// Initialize a `Data` by adopting a reference type.

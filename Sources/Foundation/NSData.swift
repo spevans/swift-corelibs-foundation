@@ -214,11 +214,10 @@ open class NSData : NSObject, NSCopying, NSMutableCopying, NSSecureCoding {
         }) {
             result = _result
         } else {
-            // Slow path, unlikely that withContiguousStorageIfAvailable will fail but if it does, fall back to .utf8CString.
-            // This will allocate and copy but it is the simplest way to get a contiguous buffer.
-            result = base64String.utf8CString.withUnsafeBufferPointer { buffer -> UnsafeMutableRawBufferPointer? in
-                let rawBuffer = UnsafeRawBufferPointer(start: buffer.baseAddress!, count: buffer.count - 1) // -1 to ignore the terminating NUL
-                return NSData.base64DecodeBytes(rawBuffer, options: options)
+            // Slow path, unlikely that withContiguousStorageIfAvailable will fail but if it does, fall back to an
+            // Array(base64String.utf8). This will allocate and copy but it is the simplest way to get a contiguous buffer.
+            result = Array(base64String.utf8).withUnsafeBytes {
+                NSData.base64DecodeBytes($0, options: options)
             }
         }
         guard let decodedBytes = result else { return nil }
@@ -653,7 +652,7 @@ open class NSData : NSObject, NSCopying, NSMutableCopying, NSSecureCoding {
      - parameter options:    Options for handling invalid input
      - returns:              The decoded bytes.
      */
-    private static func base64DecodeBytes(_ bytes: UnsafeRawBufferPointer, options: Base64DecodingOptions = []) -> UnsafeMutableRawBufferPointer? {
+    internal static func base64DecodeBytes(_ bytes: UnsafeRawBufferPointer, options: Base64DecodingOptions = []) -> UnsafeMutableRawBufferPointer? {
 
         // This table maps byte values 0-127, input bytes >127 are always invalid.
         // Map the ASCII characters "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/" -> 0...63
