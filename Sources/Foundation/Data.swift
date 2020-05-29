@@ -2519,14 +2519,15 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         if dataLength == 0 { return "" }
 
         let capacity = NSData.estimateBase64Size(length: dataLength)
-        let ptr = UnsafeMutableRawPointer.allocate(byteCount: capacity, alignment: 4)
-        defer { ptr.deallocate() }
-        let buffer = UnsafeMutableRawBufferPointer(start: ptr, count: capacity)
-        let length = self.withUnsafeBytes { inputBuffer in
-            NSData.base64EncodeBytes(inputBuffer, options: options, buffer: buffer)
+        let result = self.withUnsafeBytes { inputBuffer in
+            String(unsafeUninitializedCapacity: capacity) { stringBufferPtr in
+                let outputBuffer = UnsafeMutableRawBufferPointer(stringBufferPtr)
+                let length = NSData.base64EncodeBytes(inputBuffer, options: options, buffer: outputBuffer)
+                return length
+            }
         }
 
-        return String(decoding: UnsafeRawBufferPointer(start: ptr, count: length), as: Unicode.UTF8.self)
+        return result
     }
     
     /// Returns a Base-64 encoded `Data`.
